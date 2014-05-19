@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+
 import string
 import wx
 ROW_NAMES = list(string.ascii_uppercase)
@@ -111,7 +112,7 @@ class Well(object):
         self.right = None
         self.samples = []
         self.detectors = []
-        self.ui = Well_ui(self.plate.ui, self.plate, self.address)
+        self.ui = Well_ui(self.plate.ui, self.plate, self)
         
     def omit(self):
         self.omit = True
@@ -338,6 +339,8 @@ class Plate(object):
                 self.wells[address].setDown(self.wells[row_names[j+1] + column_names[i]])
             else:
                 self.wells[address].setDown(None)
+        self.over_well = None
+        self.start_well = None
         self.selected_rng = None
         
 
@@ -507,10 +510,11 @@ class Range(object):
 
 #UI
 class Well_ui(wx.Panel):
-    def __init__(self, parent, plate, address = 'NA', samples = 'NA', detectors = 'NA', over_color = '#0099f7', off_color = '#b3b3b3', active_color = 'gold', inactive_color = 'white'):
+    def __init__(self, parent, plate, well, address = 'NA', samples = 'NA', detectors = 'NA', over_color = '#0099f7', off_color = '#b3b3b3', active_color = 'gold', inactive_color = 'white'):
         super(Well_ui, self).__init__(parent)
         self.plate = plate
-        self.address = address
+        self.well = well
+        self.address = self.well.address
         self.samples = samples
         self.detectors = detectors
         self.active = False
@@ -523,10 +527,11 @@ class Well_ui(wx.Panel):
         self.mouseover = False
         #self.Bind(wx.EVT_PAINT, self.OnPaint)
         #self.Bind(wx.EVT_SIZE, self.OnSize)
-        self.Bind(wx.EVT_ENTER_WINDOW, self.OnEnter)
-        self.Bind(wx.EVT_LEAVE_WINDOW, self.OnLeave)
+        #self.Bind(wx.EVT_ENTER_WINDOW, self.OnEnter)
+        #self.Bind(wx.EVT_LEAVE_WINDOW, self.OnLeave)
         self.Bind(wx.EVT_LEFT_DOWN, self.OnLeftdown)
         self.Bind(wx.EVT_LEFT_UP, self.OnLeftup)
+        self.Bind(wx.EVT_MOTION, self.OnMotion)
         font9 = wx.Font(9, wx.MODERN, wx.SLANT, wx.NORMAL, False, u'Consolas')
         font8 = wx.Font(8, wx.MODERN, wx.NORMAL, wx.NORMAL, False, u'Consolas')
         self.t1 = wx.StaticText(self, label=self.address, pos = (1, 0))
@@ -536,17 +541,50 @@ class Well_ui(wx.Panel):
         self.t3 = wx.StaticText(self, label='D: ', pos = (1, 26))
         self.t3.SetFont(font8)
         self.t1.Bind(wx.EVT_LEFT_DOWN, self.OnLeftdown)
+        self.t2.Bind(wx.EVT_LEFT_DOWN, self.OnLeftdown)
+        self.t3.Bind(wx.EVT_LEFT_DOWN, self.OnLeftdown)
         self.t1.Bind(wx.EVT_LEFT_UP, self.OnLeftup)
-        self.t1.Bind(wx.EVT_ENTER_WINDOW, self.OnEnter)
-        self.t1.Bind(wx.EVT_LEAVE_WINDOW, self.OnLeave)
+        self.t2.Bind(wx.EVT_LEFT_UP, self.OnLeftup)
+        self.t3.Bind(wx.EVT_LEFT_UP, self.OnLeftup)
+        #self.t1.Bind(wx.EVT_ENTER_WINDOW, self.OnEnter)
+        #self.t1.Bind(wx.EVT_LEAVE_WINDOW, self.OnLeave)
         self.t1.Bind(wx.EVT_MOTION, self.OnMotion)
         self.t2.Bind(wx.EVT_MOTION, self.OnMotion)
         self.t3.Bind(wx.EVT_MOTION, self.OnMotion)
         
     def OnMotion(self, e):
         #print 'move'
-        self.OnEnter(e)
-        
+        #if self.well <> self.plate.over_well:
+        if True:    
+            if self.plate.over_well == None:
+                self.plate.over_well = self.well
+                self.mouseover = True
+                self.update()
+            else:
+                self.plate.over_well.ui.mouseover = False
+                self.plate.over_well.ui.update()
+                self.plate.over_well = self.well
+                self.mouseover = True
+                self.update()
+            if e.LeftIsDown():
+                if self.plate.selected_rng == None:
+                    self.plate.over_well = self.well
+                    self.mouseover = True
+                    self.plate.selected_rng = Range(self.plate.over_well, self.plate.over_well)
+                    self.plate.start_well = self.well
+                    self.active = True
+                    self.update()
+                else:
+                    new_rng = Range(self.plate.start_well, self.well)
+                    for well in self.plate.selected_rng.wells.values():
+                        if not new_rng.wellInRange(well):
+                            well.ui.active = False
+                            well.ui.update()
+                    for well in new_rng.wells.values():
+                        if not self.plate.selected_rng.wellInRange(well):
+                            well.ui.active = True
+                            well.ui.update()
+                    self.plate.selected_rng = new_rng
    
     def update(self):
         if self.active:
@@ -557,7 +595,6 @@ class Well_ui(wx.Panel):
             self.color = self.inactive_color
         self.SetBackgroundColour(self.color)
         self.Refresh()
-
 
     def OnEnter(self, e):
         if e.LeftIsDown():
@@ -586,15 +623,20 @@ class Well_ui(wx.Panel):
         self.update()
     
     def OnLeftdown(self, e):
-        self.Parent.range = []
-        print e.GetPosition()
-        if self.mouseover:
-            self.Parent.range.append(self.address)
-            self.plate.selected_rng = Range(self.plate.getWell(self.Parent.range[0]), self.plate.getWell(self.Parent.range[-1]))
-            for well in self.plate.selected_rng.wells.values():
-                well.ui.active = True
-                well.ui.update()
-            print self.Parent.range
+        self.plate.selected_rng = Range(self.plate.over_well, self.plate.over_well)
+        self.plate.start_well = self.well
+        self.active = True
+        self.plate.over_well = self.well
+        self.mouseover = True
+        self.update()
+#        self.Parent.range = []
+#        if self.mouseover:
+#            self.Parent.range.append(self.address)
+#            self.plate.selected_rng = Range(self.plate.getWell(self.Parent.range[0]), self.plate.getWell(self.Parent.range[-1]))
+#            for well in self.plate.selected_rng.wells.values():
+#                well.ui.active = True
+#                well.ui.update()
+#            print self.Parent.range
     
     def OnLeftup(self, e):
         self.Parent.range = []
@@ -615,10 +657,10 @@ class Plate_ui(wx.Frame):
         self.Bind(wx.EVT_LEFT_UP, self.OnLeftup)
 
     def OnLeftdown(self, e):
-        self.range = []
+        self.plate.selected_rng = None
         
     def OnLeftup(self, e):
-        self.range = []
+        #self.range = []
         for well in self.plate.selected_rng.wells.values():
             well.ui.active = False
             well.ui.update()
@@ -665,4 +707,5 @@ if __name__ == '__main__':
 #print d.show('detector')
 #print d1.show('sample')
 #print d1.show('detector')
+
 
