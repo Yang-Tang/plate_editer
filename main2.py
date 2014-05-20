@@ -316,7 +316,7 @@ class Plate(object):
                 grid.Add(well.ui, 0, wx.EXPAND|wx.ALL, 0)
         vbox.Add(grid, proportion = 1, flag = wx.EXPAND|wx.ALL, border = 10)
         self.ui.SetSizer(vbox)
-        self.ui.SetSize((self.n_columns * 60, self.n_rows * 48))
+        self.ui.SetSize((self.n_columns * 70, self.n_rows * 48))
         self.ui.SetTitle(self.name)
         self.ui.Centre()
         self.ui.Show()
@@ -510,7 +510,7 @@ class Range(object):
 
 #UI
 class Well_ui(wx.Panel):
-    def __init__(self, parent, plate, well, address = 'NA', samples = 'NA', detectors = 'NA', over_color = '#0099f7', off_color = '#b3b3b3', active_color = 'gold', inactive_color = 'white'):
+    def __init__(self, parent, plate, well, address = 'NA', samples = 'NA', detectors = 'NA', over_color = '#F5F5F5', active_color = '#FFF8DC', inactive_color = 'white'):
         super(Well_ui, self).__init__(parent)
         self.plate = plate
         self.well = well
@@ -519,11 +519,10 @@ class Well_ui(wx.Panel):
         self.detectors = detectors
         self.active = False
         self.over_color = over_color
-        self.off_color = off_color
-        self.color = self.off_color
         self.active_color = active_color
         self.inactive_color = inactive_color
-        self.SetBackgroundColour(self.inactive_color)
+        self.color = self.inactive_color
+        self.SetBackgroundColour(self.color)
         self.mouseover = False
         #self.Bind(wx.EVT_PAINT, self.OnPaint)
         #self.Bind(wx.EVT_SIZE, self.OnSize)
@@ -668,7 +667,7 @@ class Plate_ui(wx.Frame):
 
 def main():
     app = wx.App()
-    a = Plate('myplate',8,12)
+    a = Plate('myplate',16,24)
     app.MainLoop()
 
 if __name__ == '__main__':
