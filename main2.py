@@ -106,127 +106,82 @@ class Well(object):
         self.address = address
         self.omit = False
         self.plate = plate
-        self.up = None
-        self.down = None
-        self.left = None
-        self.right = None
         self.samples = set()
         self.detectors = set()
         self.ui = Well_ui(self.plate.ui, self.plate, self)
-        
     def omit(self):
         self.omit = True
         return self
-    
     def include(self):
         self.omit = False
         return self
-    
     def setPlate(self, plate):
         self.plate = plate
         return self
-    
-    def setUp(self, up):
-        self.up = up
-        return self
-    
-    def setDown(self, down):
-        self.down = down
-        return self
-    
-    def setLeft(self, left):
-        self.left = left
-        return self
-    
-    def setRight(self, right):
-        self.right = right
-        return self
-    
     def addSample(self, sample):
         self.samples.add(sample)
         sample.wells.add(self)
         return self
-    
     def addDetector(self, detector):
         self.detectors.add(detector)
         detector.wells.add(self)
         return self
-    
     def removeSample(self, sample):
         self.samples.discard(sample)
         sample.wells.discard(self)
         return self
-    
     def removeDetector(self, detector):
         self.detectors.discard(detector)
         detector.wells.discard(self)
         return self
-    
     def clearSamples(self):
         for sample in self.samples:
             sample.wells.discard(self)
         self.samples.clear()
         return self
-    
     def clearDetectors(self):
         for detector in self.detectors:
             detector.wells.discard(self)
         self.detectors.clear()
         return self
-    
     def clearAll(self):
         self.clearSamples()
         self.clearDetectors()
         return self
-        
     def copySamplesTo(self, new_well):
         new_well.clearSamples()
         for sample in self.samples:
             new_well.addSample(sample)
         return self
-    
     def copyDetectorsTo(self, new_well):
         new_well.clearDetectors()
         for detector in self.detectors:
             new_well.addDetector(detector)
         return self
-    
     def copyAllTo(self, new_well):
         self.copySamplesTo(new_well)
         self.copyDetectorsTo(new_well)
         return self
-    
     def moveSamplesTo(self, new_well):
         new_well.clearSamples()
         for sample in self.samples:
             new_well.addSample(sample)
         self.clearSamples()
         return self
-    
     def moveDetectorsTo(self, new_well):
         new_well.clearDetectors()
         for detector in self.detectors:
             new_well.addDetector(detector)
         self.clearDetectors()
         return self
-    
     def moveAllTo(self, new_well):
         self.moveSamplesTo(new_well)
         self.moveDetectorsTo(new_well)
         return self
-
     def getAddress(self):
         return self.address
     def getPlate(self):
         return self.plate
-    def getUp(self):
-        return self.up
-    def getDown(self):
-        return self.down
-    def getLeft(self):
-        return self.left    
-    def getRight(self):
-        return self.right
     def getSamples(self):
         return self.samples
     def getDetectors(self):
@@ -259,77 +214,29 @@ class Well(object):
         if tmp == '':
             tmp = 'NA'
         return tmp
-    
     def offset(self, n_rows, n_columns):
-        well = self
-        if n_rows < 0:
-            for i in range(abs(n_rows)):
-                well = well.getUp()
-                if well == None:
-                    return None
-        else:
-            for i in range(abs(n_rows)):
-                well = well.getDown()
-                if well == None:
-                    return None
-        if n_columns < 0:
-            for i in range(abs(n_columns)):
-                well = well.getLeft()
-                if well == None:
-                    return None
-        else:
-            for i in range(abs(n_columns)):
-                well = well.getRight()
-                if well == None:
-                    return None
-        return well
+        r = ROW_NAMES.index(self.address[0])
+        c = COLUMN_NAMES.index(self.address[1:])
+        try:
+            new_address = ROW_NAMES[r + n_rows] + COLUMN_NAMES[c + n_columns]
+        except IndexError:
+            return None
+        return self.plate.getWell(new_address)
 
 class Plate(object):
-    def __init__(self, name, n_rows, n_columns):
+    def __init__(self, name = 'Plate', n_rows = 8, n_columns = 12):
         self.name = name
         self.n_rows = n_rows
         self.n_columns = n_columns
-        self.ui = Plate_ui(None, self, self.n_rows, self.n_columns, self.name)
+        self.ui = Plate_ui(None, self)
         self.wells = {}
-        self.row_names = ROW_NAMES[:n_rows]
-        self.column_names = COLUMN_NAMES[:n_columns]
-        vbox = wx.BoxSizer(wx.VERTICAL)
-        grid = wx.GridSizer(self.n_rows, self.n_columns, 1, 1)
-        for j in self.row_names:
-            for i in self.column_names:
-                address = j + i
+        self.grid = wx.GridSizer(self.n_rows, self.n_columns, 1, 1)
+        for j in range(self.n_rows):
+            for i in range(self.n_columns):
+                address = ROW_NAMES[j] + COLUMN_NAMES[i]
                 well = Well(address, self)
-                #well.setPlate(self)
                 self.wells[address] = well
-                grid.Add(well.ui, 0, wx.EXPAND|wx.ALL, 0)
-        vbox.Add(grid, proportion = 1, flag = wx.EXPAND|wx.ALL, border = 10)
-        self.ui.SetSizer(vbox)
-        self.ui.SetSize((self.n_columns * 70, self.n_rows * 48))
-        self.ui.SetTitle(self.name)
-        self.ui.Centre()
-        self.ui.Show()
-        for address in self.wells:
-            i = self.column_names.index(address[1:])
-            j = self.row_names.index(address[0])
-            if i <> 0:
-                self.wells[address].setLeft(self.wells[self.row_names[j] + self.column_names[i-1]])
-            else:
-                self.wells[address].setLeft(None)
-            if i <> n_columns - 1:
-                self.wells[address].setRight(self.wells[self.row_names[j] + self.column_names[i+1]])
-            else:
-                self.wells[address].setRight(None)            
-            if j <> 0:
-                self.wells[address].setUp(self.wells[self.row_names[j-1] + self.column_names[i]])
-            else:
-                self.wells[address].setUp(None)                
-            if j <> n_rows - 1:
-                self.wells[address].setDown(self.wells[self.row_names[j+1] + self.column_names[i]])
-            else:
-                self.wells[address].setDown(None)
-        self.over_well = None
-        self.start_well = None
-        self.selected_rng = None
+                self.grid.Add(well.ui, 0, wx.EXPAND|wx.ALL, 0)
 
     def getName(self):
         return self.name
@@ -338,15 +245,26 @@ class Plate(object):
     def getNcols(self):
         return self.n_columns
     def getRow_names(self):
-        return self.row_names    
+        return ROW_NAMES[:self.n_rows]    
     def getColumn_names(self):
-        return self.column_names    
+        return COLUMN_NAMES[:self.n_columns]    
     def getWell(self, address):
         return self.wells.get(address.upper(), None)    
     def wellInPlate(self, well):
         return well.getPlate() == self    
     def rangeInPlate(self, myRange):
         return myRange.getPlate() == self
+    def initui(self):
+        vbox = wx.BoxSizer(wx.VERTICAL)
+        vbox.Add(self.grid, proportion = 1, flag = wx.EXPAND|wx.ALL, border = 10)
+        self.ui.SetSizer(vbox)
+        self.ui.SetSize((self.n_columns * 70, self.n_rows * 48))
+        self.ui.SetTitle(self.name)
+        self.ui.Centre()
+        self.ui.Show()
+        self.over_well = None
+        self.start_well = None
+        self.selected_rng = None
 
 class Range(object):
     def __init__(self, start_well, end_well):
@@ -360,7 +278,7 @@ class Range(object):
         j2 = row_names.index(end_well.getAddress()[0])
         i0 = min(i1, i2)
         j0 = min(j1, j2)
-        self.start_well = self.plate.getWell(row_names[min(j1, j2)] + column_names[min(i1, i2)])
+        self.start_well = self.plate.getWell(row_names[j0] + column_names[i0])
         self.n_rows = abs(j1 - j2) + 1
         self.n_columns = abs(i1 - i2) + 1
         self.column_names = column_names[i0 : (i0 + self.n_columns)]
@@ -496,13 +414,10 @@ class Range(object):
 
 #UI
 class Well_ui(wx.Panel):
-    def __init__(self, parent, plate, well, address = 'NA', samples = 'NA', detectors = 'NA', over_color = '#F5F5F5', active_color = '#FFF8DC', inactive_color = 'white'):
+    def __init__(self, parent, plate, well, over_color = '#F5F5F5', active_color = '#FFF8DC', inactive_color = 'white'):
         super(Well_ui, self).__init__(parent)
         self.plate = plate
         self.well = well
-        self.address = self.well.address
-        self.samples = samples
-        self.detectors = detectors
         self.active = False
         self.over_color = over_color
         self.active_color = active_color
@@ -510,20 +425,16 @@ class Well_ui(wx.Panel):
         self.color = self.inactive_color
         self.SetBackgroundColour(self.color)
         self.mouseover = False
-        #self.Bind(wx.EVT_PAINT, self.OnPaint)
-        #self.Bind(wx.EVT_SIZE, self.OnSize)
-        #self.Bind(wx.EVT_ENTER_WINDOW, self.OnEnter)
-        #self.Bind(wx.EVT_LEAVE_WINDOW, self.OnLeave)
         self.Bind(wx.EVT_LEFT_DOWN, self.OnLeftdown)
         self.Bind(wx.EVT_LEFT_UP, self.OnLeftup)
         self.Bind(wx.EVT_MOTION, self.OnMotion)
         font9 = wx.Font(9, wx.MODERN, wx.SLANT, wx.NORMAL, False, u'Consolas')
         font8 = wx.Font(8, wx.MODERN, wx.NORMAL, wx.NORMAL, False, u'Consolas')
-        self.t1 = wx.StaticText(self, label=self.address, pos = (1, 0))
+        self.t1 = wx.StaticText(self, label=self.well.address, pos = (1, 0))
         self.t1.SetFont(font9)
-        self.t2 = wx.StaticText(self, label=self.samples, pos = (1, 13))
+        self.t2 = wx.StaticText(self, label=self.well.getSampleNames(), pos = (1, 13))
         self.t2.SetFont(font8)
-        self.t3 = wx.StaticText(self, label=self.detectors, pos = (1, 26))
+        self.t3 = wx.StaticText(self, label=self.well.getDetectorNames(), pos = (1, 26))
         self.t3.SetFont(font8)
         self.t1.Bind(wx.EVT_LEFT_DOWN, self.OnLeftdown)
         self.t2.Bind(wx.EVT_LEFT_DOWN, self.OnLeftdown)
@@ -531,8 +442,6 @@ class Well_ui(wx.Panel):
         self.t1.Bind(wx.EVT_LEFT_UP, self.OnLeftup)
         self.t2.Bind(wx.EVT_LEFT_UP, self.OnLeftup)
         self.t3.Bind(wx.EVT_LEFT_UP, self.OnLeftup)
-        #self.t1.Bind(wx.EVT_ENTER_WINDOW, self.OnEnter)
-        #self.t1.Bind(wx.EVT_LEAVE_WINDOW, self.OnLeave)
         self.t1.Bind(wx.EVT_MOTION, self.OnMotion)
         self.t2.Bind(wx.EVT_MOTION, self.OnMotion)
         self.t3.Bind(wx.EVT_MOTION, self.OnMotion)
@@ -540,36 +449,31 @@ class Well_ui(wx.Panel):
     def OnMotion(self, e):
         #print 'move'
         #if self.well <> self.plate.over_well:
-        if True:    
-            if self.plate.over_well == None:
-                self.plate.over_well = self.well
-                self.mouseover = True
+        if self.plate.over_well <> None:
+            self.plate.over_well.ui.mouseover = False
+            self.plate.over_well.ui.update()
+        self.plate.over_well = self.well
+        self.mouseover = True
+        self.update()
+        if e.LeftIsDown():
+            if self.plate.selected_rng == None:
+                #self.plate.over_well = self.well
+                #self.mouseover = True
+                self.plate.selected_rng = Range(self.plate.over_well, self.plate.over_well)
+                self.plate.start_well = self.well
+                self.active = True
                 self.update()
             else:
-                self.plate.over_well.ui.mouseover = False
-                self.plate.over_well.ui.update()
-                self.plate.over_well = self.well
-                self.mouseover = True
-                self.update()
-            if e.LeftIsDown():
-                if self.plate.selected_rng == None:
-                    self.plate.over_well = self.well
-                    self.mouseover = True
-                    self.plate.selected_rng = Range(self.plate.over_well, self.plate.over_well)
-                    self.plate.start_well = self.well
-                    self.active = True
-                    self.update()
+                new_rng = Range(self.plate.start_well, self.well)
+                if self.well in self.plate.selected_rng.wells:
+                    for well in self.plate.selected_rng.wells - new_rng.wells:
+                        well.ui.active = False
+                        well.ui.update()
                 else:
-                    new_rng = Range(self.plate.start_well, self.well)
-                    for well in self.plate.selected_rng.wells:
-                        if not new_rng.wellInRange(well):
-                            well.ui.active = False
-                            well.ui.update()
-                    for well in new_rng.wells:
-                        if not self.plate.selected_rng.wellInRange(well):
-                            well.ui.active = True
-                            well.ui.update()
-                    self.plate.selected_rng = new_rng
+                    for well in new_rng.wells - self.plate.selected_rng.wells:
+                        well.ui.active = True
+                        well.ui.update()
+                self.plate.selected_rng = new_rng
    
     def update(self):
         if self.active:
@@ -583,32 +487,6 @@ class Well_ui(wx.Panel):
         self.t3.SetLabel(self.well.getDetectorNames())
         self.Refresh()
 
-    def OnEnter(self, e):
-        if e.LeftIsDown():
-            self.Parent.range.append(self.address)
-            new_rng = Range(self.plate.getWell(self.Parent.range[0]), self.plate.getWell(self.Parent.range[-1]))
-            if self.plate.selected_rng <> None:
-                for well in self.plate.selected_rng.wells:
-                    if not new_rng.wellInRange(well):
-                        well.ui.active = False
-                        well.ui.update()
-                for well in new_rng.wells:
-                    if not self.plate.selected_rng.wellInRange(well):
-                        well.ui.active = True
-                        well.ui.update()
-            else:
-                for well in new_rng.wells:
-                    well.ui.active = True
-                    well.ui.update()
-            self.plate.selected_rng = new_rng
-            print self.Parent.range
-        self.mouseover = True
-        self.update()
-    
-    def OnLeave(self, e):
-        self.mouseover = False
-        self.update()
-    
     def OnLeftdown(self, e):
         self.plate.selected_rng = Range(self.plate.over_well, self.plate.over_well)
         self.plate.start_well = self.well
@@ -616,30 +494,17 @@ class Well_ui(wx.Panel):
         self.plate.over_well = self.well
         self.mouseover = True
         self.update()
-#        self.Parent.range = []
-#        if self.mouseover:
-#            self.Parent.range.append(self.address)
-#            self.plate.selected_rng = Range(self.plate.getWell(self.Parent.range[0]), self.plate.getWell(self.Parent.range[-1]))
-#            for well in self.plate.selected_rng.wells:
-#                well.ui.active = True
-#                well.ui.update()
-#            print self.Parent.range
     
     def OnLeftup(self, e):
         self.plate.selected_rng.autoFill(item, entry, direction = 1)
         for well in self.plate.selected_rng.wells:
             well.ui.active = False
             well.ui.update()
-
     
 class Plate_ui(wx.Frame):
-    def __init__(self, parent, plate, nrow = 8, ncol = 12, title = 'Plate'):
+    def __init__(self, parent, plate):
         super(Plate_ui, self).__init__(parent)
         self.plate = plate
-        self.range = []
-        self.nrow = nrow
-        self.ncol = ncol
-        self.title = title
         self.Bind(wx.EVT_LEFT_DOWN, self.OnLeftdown)
         self.Bind(wx.EVT_LEFT_UP, self.OnLeftup)
 
@@ -658,7 +523,7 @@ def main():
 
     app = wx.App()
     a = Plate('myplate',16,24)
-
+    a.initui()
     #b = Range(a.getWell('a1'),a.getWell('d5'))
     #b.autoFill(item, entry, direction = 1)
     app.MainLoop()
