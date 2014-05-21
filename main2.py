@@ -109,15 +109,8 @@ class Well(object):
         self.samples = set()
         self.detectors = set()
         self.ui = Well_ui(self.plate.ui, self.plate, self)
-    def omit(self):
-        self.omit = True
-        return self
-    def include(self):
-        self.omit = False
-        return self
-    def setPlate(self, plate):
-        self.plate = plate
-        return self
+        print 'well inited!'
+#
     def addSample(self, sample):
         self.samples.add(sample)
         sample.wells.add(self)
@@ -178,14 +171,6 @@ class Well(object):
         self.moveSamplesTo(new_well)
         self.moveDetectorsTo(new_well)
         return self
-    def getAddress(self):
-        return self.address
-    def getPlate(self):
-        return self.plate
-    def getSamples(self):
-        return self.samples
-    def getDetectors(self):
-        return self.detectors
     def getSampleNames(self):
         tmp = ''
         for i in self.samples:
@@ -236,7 +221,8 @@ class Plate(object):
                 address = ROW_NAMES[j] + COLUMN_NAMES[i]
                 well = Well(address, self)
                 self.wells[address] = well
-                self.grid.Add(well.ui, 0, wx.EXPAND|wx.ALL, 0)
+                self.grid.Add(well.ui, 1, wx.EXPAND|wx.ALL, 0)
+        print 'Plate inited!'
 
     def getName(self):
         return self.name
@@ -251,11 +237,11 @@ class Plate(object):
     def getWell(self, address):
         return self.wells.get(address.upper(), None)    
     def wellInPlate(self, well):
-        return well.getPlate() == self    
+        return well.plate == self    
     def rangeInPlate(self, myRange):
-        return myRange.getPlate() == self
+        return myRange.plate == self
     def initui(self):
-        vbox = wx.BoxSizer(wx.VERTICAL)
+        vbox = wx.BoxSizer(wx.HORIZONTAL)
         vbox.Add(self.grid, proportion = 1, flag = wx.EXPAND|wx.ALL, border = 10)
         self.ui.SetSizer(vbox)
         self.ui.SetSize((self.n_columns * 70, self.n_rows * 48))
@@ -268,14 +254,14 @@ class Plate(object):
 
 class Range(object):
     def __init__(self, start_well, end_well):
-        self.plate = start_well.getPlate()
+        self.plate = start_well.plate
         self.wells = set()
         column_names = self.plate.getColumn_names()
         row_names = self.plate.getRow_names()
-        i1 = column_names.index(start_well.getAddress()[1:])
-        i2 = column_names.index(end_well.getAddress()[1:])
-        j1 = row_names.index(start_well.getAddress()[0])
-        j2 = row_names.index(end_well.getAddress()[0])
+        i1 = column_names.index(start_well.address[1:])
+        i2 = column_names.index(end_well.address[1:])
+        j1 = row_names.index(start_well.address[0])
+        j2 = row_names.index(end_well.address[0])
         i0 = min(i1, i2)
         j0 = min(j1, j2)
         self.start_well = self.plate.getWell(row_names[j0] + column_names[i0])
@@ -303,7 +289,7 @@ class Range(object):
         return well in self.wells
     
     def rangeInRange(self, myRange):
-        if myRange.getPlate() <> self.getPlate():
+        if myRange.plate <> self.plate:
             return False
         for well in myRange.wells:
             if not self.wellInRange(well):
@@ -317,15 +303,15 @@ class Range(object):
             for i in range(self.n_columns):
                 well = self.start_well.offset(j, i)
                 if item.lower() == 'address':
-                    output += well.getAddress()
+                    output += well.address
                 elif item.lower() == 'sample':
-                    output += well.getSampleNames() #if well.getSamples() <> [] else 'N/A'
+                    output += well.getSampleNames() 
                 elif item.lower() == 'group':
-                    output += well.getGroupNames() #if well.getSamples() <> [] else 'N/A'
+                    output += well.getGroupNames() 
                 elif item.lower() == 'detector':
-                    output +=  well.getDetectorNames() #if well.getDetectors() <> [] else 'N/A'
+                    output +=  well.getDetectorNames() 
                 elif item.lower() == 'value':
-                    output +=  well.getDetectorValues() #if well.getDetectors() <> [] else 'N/A'
+                    output +=  well.getDetectorValues() 
                 output += chr(9)
             output += chr(10)
         return output
@@ -368,9 +354,9 @@ class Range(object):
         return index
 
     def copyTo(self, new_range, item = 'all'):
-        tmp_plate = Plate('tmp', self.getPlate().n_rows, self.getPlate().n_columns)
-        address0 = self.getStartWell().getAddress()
-        address1 = new_range.getStartWell().getAddress()
+        tmp_plate = Plate('tmp', self.plate.n_rows, self.plate.n_columns)
+        address0 = self.getStartWell().address
+        address1 = new_range.getStartWell().address
         j = ROW_NAMES.index(address1[0]) - ROW_NAMES.index(address0[0])
         i = COLUMN_NAMES.index(address1[1:]) - COLUMN_NAMES.index(address0[1:])
         for well in self.wells:
@@ -381,14 +367,14 @@ class Range(object):
             elif item.lower() == 'detector':
                 well.copyDetectorsTo(tmp_plate.getWell(well.address))
         for well in self.wells:
-            new_well = new_range.getPlate().getWell(well.address).offset(j, i)
+            new_well = new_range.plate.getWell(well.address).offset(j, i)
             if new_well <> None:
                 tmp_plate.getWell(well.address).copyAllTo(new_well)
                 
     def moveTo(self, new_range, item = 'all'):
-        tmp_plate = Plate('tmp', self.getPlate().n_rows, self.getPlate().n_columns)
-        address0 = self.getStartWell().getAddress()
-        address1 = new_range.getStartWell().getAddress()
+        tmp_plate = Plate('tmp', self.plate.n_rows, self.plate.n_columns)
+        address0 = self.getStartWell().address
+        address1 = new_range.getStartWell().address
         j = ROW_NAMES.index(address1[0]) - ROW_NAMES.index(address0[0])
         i = COLUMN_NAMES.index(address1[1:]) - COLUMN_NAMES.index(address0[1:])
         for well in self.wells:
@@ -399,7 +385,7 @@ class Range(object):
             elif item.lower() == 'detector':
                 well.moveDetectorsTo(tmp_plate.getWell(well.address))
         for well in self.wells:
-            new_well = new_range.getPlate().getWell(well.address).offset(j, i)
+            new_well = new_range.plate.getWell(well.address).offset(j, i)
             if new_well <> None:
                 tmp_plate.getWell(well.address).copyAllTo(new_well)
                 
@@ -436,6 +422,7 @@ class Well_ui(wx.Panel):
         self.t2.SetFont(font8)
         self.t3 = wx.StaticText(self, label=self.well.getDetectorNames(), pos = (1, 26))
         self.t3.SetFont(font8)
+        self.t3.Wrap(self.GetSize()[0])
         self.t1.Bind(wx.EVT_LEFT_DOWN, self.OnLeftdown)
         self.t2.Bind(wx.EVT_LEFT_DOWN, self.OnLeftdown)
         self.t3.Bind(wx.EVT_LEFT_DOWN, self.OnLeftdown)
@@ -522,8 +509,10 @@ class Plate_ui(wx.Frame):
 def main():
 
     app = wx.App()
-    a = Plate('myplate',16,24)
+    a = Plate('myplate',8,12)
+    
     a.initui()
+    print 'Plate showed!'
     #b = Range(a.getWell('a1'),a.getWell('d5'))
     #b.autoFill(item, entry, direction = 1)
     app.MainLoop()
@@ -535,7 +524,7 @@ if __name__ == '__main__':
     neg = Group('Neg').addSampleList(s.subset(21,10))
     shRNA = Group('shRNA').addSampleList(s.subset(31,10))
     item = 'sample'
-    entry = naive.getSamples() + null.getSamples() + neg.getSamples() + shRNA.getSamples()
+    entry = naive.samples + null.samples + neg.samples + shRNA.samples
     main()
 
 #a = Plate('myplate',16,24)
@@ -546,7 +535,7 @@ if __name__ == '__main__':
 #neg = Group('Neg').addSampleList(s.subset(21,10))
 #shRNA = Group('shRNA').addSampleList(s.subset(31,10))
 #item = 'sample'
-#entry = naive.getSamples() + null.getSamples() + neg.getSamples() + shRNA.getSamples()
+#entry = naive.samples + null.samples + neg.samples + shRNA.samples
 #b = Range(a.getWell('a1'),a.getWell('d5'))
 #b.autoFill(item, entry, direction = 1)
 
