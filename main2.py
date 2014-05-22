@@ -414,6 +414,8 @@ class Well_ui(wx.Panel):
         self.Bind(wx.EVT_LEFT_DOWN, self.OnLeftdown)
         self.Bind(wx.EVT_LEFT_UP, self.OnLeftup)
         self.Bind(wx.EVT_MOTION, self.OnMotion)
+        self.Bind(wx.EVT_KEY_DOWN, self.OnKeydown)
+        self.Bind(wx.EVT_CHAR, self.OnChar)
         font9 = wx.Font(9, wx.MODERN, wx.SLANT, wx.NORMAL, False, u'Consolas')
         font8 = wx.Font(8, wx.MODERN, wx.NORMAL, wx.NORMAL, False, u'Consolas')
         self.t1 = wx.StaticText(self, label=self.well.address, pos = (1, 0))
@@ -432,7 +434,27 @@ class Well_ui(wx.Panel):
         self.t1.Bind(wx.EVT_MOTION, self.OnMotion)
         self.t2.Bind(wx.EVT_MOTION, self.OnMotion)
         self.t3.Bind(wx.EVT_MOTION, self.OnMotion)
-        
+
+    def OnChar(self, e):
+        print 'dfdf'
+    
+    def OnKeydown(self, e):
+        keymap = {'A' : (0, -1),
+                  'S' : (1, 0),
+                  'D' : (0, 1),
+                  'W' : (-1, 0)}
+        key = chr(e.GetKeyCode())
+        a = keymap.get(key)
+        if a <> None and self.plate.over_well <> None:
+            old_well = self.plate.over_well
+            new_well = old_well.offset(a[0], a[1])
+            if new_well <> None:
+                old_well.ui.mouseover = False
+                old_well.ui.update()
+                new_well.ui.mouseover = True
+                new_well.ui.update()
+                self.plate.over_well = new_well
+    
     def OnMotion(self, e):
         #print 'move'
         #if self.well <> self.plate.over_well:
@@ -440,6 +462,7 @@ class Well_ui(wx.Panel):
             self.plate.over_well.ui.mouseover = False
             self.plate.over_well.ui.update()
         self.plate.over_well = self.well
+        #self.SetFocus()
         self.mouseover = True
         self.update()
         if e.LeftIsDown():
@@ -479,6 +502,7 @@ class Well_ui(wx.Panel):
         self.plate.start_well = self.well
         self.active = True
         self.plate.over_well = self.well
+        #self.SetFocus()
         self.mouseover = True
         self.update()
     
