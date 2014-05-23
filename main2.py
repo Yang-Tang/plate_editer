@@ -462,7 +462,7 @@ class Well_ui(wx.Panel):
             self.plate.over_well.ui.mouseover = False
             self.plate.over_well.ui.update()
         self.plate.over_well = self.well
-        #self.SetFocus()
+        self.SetFocus()
         self.mouseover = True
         self.update()
         if e.LeftIsDown():
@@ -502,7 +502,7 @@ class Well_ui(wx.Panel):
         self.plate.start_well = self.well
         self.active = True
         self.plate.over_well = self.well
-        #self.SetFocus()
+        self.SetFocus()
         self.mouseover = True
         self.update()
     
