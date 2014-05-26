@@ -332,7 +332,7 @@ class Range(object):
         else:
             return Range(start_well, end_well)
         
-    def autoFill(self, item = 'sample', entry = [], index = 0, n_row = 2, n_column = 2, direction = 1, fill_by = 'replace', s_shape = False):
+    def autoFill(self, item = 'sample', entry = [], index = 0, n_row = 2, n_column = 2, direction = 1, fill_by = 'replace', iteration = True, s_shape = False):
         x = self.n_columns / n_column
         y = self.n_rows / n_row
         if direction == 1:
@@ -349,7 +349,8 @@ class Range(object):
                                 if fill_by == 'replace':
                                     well.offset(n, m).clearDetectors()
                                 well.offset(n, m).addDetector(entry[index % len(entry)])
-                    index += 1
+                    if iteration:
+                        index += 1
         elif direction == 2:
             for j in range(y):
                 for i in range(x):
@@ -364,8 +365,9 @@ class Range(object):
                                 if fill_by == 'replace':
                                     well.offset(n, m).clearDetectors()
                                 well.offset(n, m).addDetector(entry[index % len(entry)])
-                    index += 1
-        return index
+                    if iteration:
+                        index += 1
+        return index % len(entry)
 
     def copyTo(self, new_range, item = 'all'):
         tmp_plate = Plate('tmp', self.plate.n_rows, self.plate.n_columns)
@@ -426,7 +428,7 @@ class Well_ui(wx.Panel):
         self.SetBackgroundColour(self.color)
         self.mouseover = False
         self.Bind(wx.EVT_LEFT_DOWN, self.OnLeftdown)
-        self.Bind(wx.EVT_LEFT_UP, self.OnLeftup)
+        self.Bind(wx.EVT_LEFT_UP, self.Parent.OnLeftup)
         self.Bind(wx.EVT_MOTION, self.OnMotion)
         self.Bind(wx.EVT_KEY_DOWN, self.OnKeydown)
         self.Bind(wx.EVT_KEY_UP, self.OnKeyup)
@@ -532,9 +534,9 @@ class Well_ui(wx.Panel):
         self.Parent.sb.SetStatusText('Address: ' + self.well.address, 0)
         self.Parent.sb.SetStatusText('Samples: ' + self.well.getSampleNames(), 1)
         self.Parent.sb.SetStatusText('Detectors: ' + self.well.getDetectorNames(), 2)
-        self.Parent.Info_Address.SetLabel(self.well.address)
-        self.Parent.Info_Samples.SetLabel(self.well.getSampleNames())
-        self.Parent.Info_Detectors.SetLabel(self.well.getDetectorNames())
+        #self.Parent.Info_Address.SetLabel(self.well.address)
+        #self.Parent.Info_Samples.SetLabel(self.well.getSampleNames())
+        #self.Parent.Info_Detectors.SetLabel(self.well.getDetectorNames())
         self.Refresh()
 
     def OnLeftdown(self, e):
@@ -547,14 +549,16 @@ class Well_ui(wx.Panel):
         self.update()
     
     def OnLeftup(self, e):
-        self.plate.selected_rng.autoFill(item = self.Parent.item,
-                                         entry = self.Parent.entry,
-                                         index = self.Parent.index[self.Parent.item],
-                                         n_row = self.Parent.Settings_row.GetValue(),
-                                         n_column = self.Parent.Settings_col.GetValue(),
-                                         fill_by = self.Parent.Operation_Fill_by.GetValue(),
-                                         direction = self.Parent.direction)
-        
+        n = self.plate.selected_rng.autoFill(item = self.Parent.item,
+                                            entry = self.Parent.entry,
+                                            index = self.Parent.index[self.Parent.item],
+                                            n_row = self.Parent.Settings_row.GetValue(),
+                                            n_column = self.Parent.Settings_col.GetValue(),
+                                            fill_by = self.Parent.Operation_Fill_by.GetValue(),
+                                            direction = self.Parent.direction)
+        self.Parent.index[self.Parent.item] = n
+        print n
+        self.Parent.Settings_entry.SetSelection(n)
         for well in self.plate.selected_rng.wells:
             well.ui.active = False
             well.ui.update()
@@ -564,11 +568,11 @@ class Plate_ui(wx.Frame):
     def __init__(self, parent, plate):
         super(Plate_ui, self).__init__(parent)
         self.plate = plate
+        self.operation = 'fill'
         self.item = 'sample'
         self.index = {'sample' : 0, 'detector' : 0}
         self.direction = 1
         self.clear = 'all'
-        self.iteration = True
         self.s_shape = False
         self.entry = sample
         self.initui()
@@ -589,8 +593,8 @@ class Plate_ui(wx.Frame):
         width = 150
         pos += gap
         wx.StaticBox(toppanel, label='Operation', pos=(pos, 0), size=(width, hight))
-        wx.RadioButton(toppanel, label='Fill by:', pos=(pos + gap, 23), style=wx.RB_GROUP)
-        wx.RadioButton(toppanel, label='Clear:', pos=(pos + gap, 53))
+        self.Operation_fill = wx.RadioButton(toppanel, label='Fill by:', pos=(pos + gap, 23), style=wx.RB_GROUP)
+        self.Operation_clear = wx.RadioButton(toppanel, label='Clear:', pos=(pos + gap, 53))
         pos1 = pos + 70
         self.Operation_Fill_by = wx.ComboBox(toppanel, pos=(pos1, 20), size=(70, -1), choices=['replace', 'append'], style=wx.CB_READONLY)
         self.Operation_Fill_by.SetValue('replace')
@@ -616,7 +620,7 @@ class Plate_ui(wx.Frame):
         for i in self.entry:
             choice_list.append(i.name)
         self.Settings_entry = wx.ComboBox(toppanel, pos=(pos1, 20), size=(80, -1), choices=choice_list, style=wx.CB_READONLY)
-        self.Settings_entry.SetValue(choice_list[0])
+        self.Settings_entry.SetValue(choice_list[self.index[self.item]])
         self.Settings_col = wx.SpinCtrl(toppanel, value='2', pos=(pos1, 50), size=(40, -1))
         self.Settings_col.SetRange(1, self.plate.n_columns)
         pos1 += 42
@@ -640,17 +644,17 @@ class Plate_ui(wx.Frame):
         
         self.sb = self.CreateStatusBar(3)
         
-        width = 150
-        pos += gap
-        wx.StaticBox(toppanel, label='Info', pos=(pos, 0), size=(width, hight))
-        wx.StaticText(toppanel, label='Address:', pos=(pos + gap, 20))
-        wx.StaticText(toppanel, label='Samples:', pos=(pos + gap, 40))
-        wx.StaticText(toppanel, label='Detectors:', pos=(pos + gap, 60))
-        pos1 = pos + 70
-        self.Info_Address = wx.StaticText(toppanel, label='NA', pos=(pos1, 20))
-        self.Info_Samples = wx.StaticText(toppanel, label='NA', pos=(pos1, 40))
-        self.Info_Detectors = wx.StaticText(toppanel, label='NA', pos=(pos1, 60))
-        pos += width
+        #width = 150
+        #pos += gap
+        #wx.StaticBox(toppanel, label='Info', pos=(pos, 0), size=(width, hight))
+        #wx.StaticText(toppanel, label='Address:', pos=(pos + gap, 20))
+        #wx.StaticText(toppanel, label='Samples:', pos=(pos + gap, 40))
+        #wx.StaticText(toppanel, label='Detectors:', pos=(pos + gap, 60))
+        #pos1 = pos + 70
+        #self.Info_Address = wx.StaticText(toppanel, label='NA', pos=(pos1, 20))
+        #self.Info_Samples = wx.StaticText(toppanel, label='NA', pos=(pos1, 40))
+        #self.Info_Detectors = wx.StaticText(toppanel, label='NA', pos=(pos1, 60))
+        #pos += width
 
         self.vbox = wx.BoxSizer(wx.VERTICAL)
         self.vbox.Add(toppanel, 0, flag=wx.EXPAND|wx.LEFT|wx.TOP|wx.RIGHT, border = 0)
@@ -658,12 +662,23 @@ class Plate_ui(wx.Frame):
     def bind_event(self):
         self.Bind(wx.EVT_LEFT_DOWN, self.OnLeftdown)
         self.Bind(wx.EVT_LEFT_UP, self.OnLeftup)
+        self.Operation_fill.Bind(wx.EVT_RADIOBUTTON, self.OnOperationchange)
+        self.Operation_clear.Bind(wx.EVT_RADIOBUTTON, self.OnOperationchange)
         self.Items_Samples.Bind(wx.EVT_RADIOBUTTON, self.OnItemchange)
         self.Items_Detectors.Bind(wx.EVT_RADIOBUTTON, self.OnItemchange)
         self.Items_Values.Bind(wx.EVT_RADIOBUTTON, self.OnItemchange)
+        self.Settings_entry.Bind(wx.EVT_COMBOBOX, self.OnEntrychange)
         self.Settings_Direction1.Bind(wx.EVT_RADIOBUTTON, self.OnDirectionchange)
         self.Settings_Direction2.Bind(wx.EVT_RADIOBUTTON, self.OnDirectionchange)
 
+    def OnOperationchange(self, e):
+        f = self.Operation_fill.GetValue()
+        c = self.Operation_clear.GetValue()
+        if f:
+            self.operation = 'fill'
+        elif c:
+            self.operation = 'clear'
+    
     def OnItemchange(self, e):
         s = self.Items_Samples.GetValue()
         d = self.Items_Detectors.GetValue()
@@ -678,8 +693,8 @@ class Plate_ui(wx.Frame):
             choice_list = []
             for i in self.entry:
                 choice_list.append(i.name)
-                self.Settings_entry.Append(i.name)
-            self.Settings_entry.SetValue(choice_list[0])
+            self.Settings_entry.SetItems(choice_list)
+            self.Settings_entry.SetValue(choice_list[self.index[self.item]])
         elif d:
             self.item = 'detector'
             self.entry = detector
@@ -690,8 +705,8 @@ class Plate_ui(wx.Frame):
             choice_list = []
             for i in self.entry:
                 choice_list.append(i.name)
-                self.Settings_entry.Append(i.name)
-            self.Settings_entry.SetValue(choice_list[0])
+            self.Settings_entry.SetItems(choice_list)
+            self.Settings_entry.SetValue(choice_list[self.index[self.item]])
         elif v:
             self.item = 'value'
             self.entry = []
@@ -700,6 +715,9 @@ class Plate_ui(wx.Frame):
                 well.ui.Refresh()
             self.Settings_entry.Clear()
 
+    def OnEntrychange(self, e):
+        self.index[self.item] = self.Settings_entry.GetCurrentSelection()
+    
     def OnDirectionchange(self, e):
         d1 = self.Settings_Direction1.GetValue()
         d2 = self.Settings_Direction2.GetValue()
@@ -713,22 +731,30 @@ class Plate_ui(wx.Frame):
         self.plate.selected_rng = None
         
     def OnLeftup(self, e):
-        self.plate.selected_rng.autoFill(item = self.item,
-                                         entry = self.entry,
-                                         index = self.index[self.Parent.item],
-                                         n_row = self.Settings_row.GetValue(),
-                                         n_column = self.Settings_col.GetValue(),
-                                         fill_by = self.Operation_Fill_by.GetValue(),
-                                         direction = self.direction)
-        for well in self.plate.selected_rng.wells:
-            well.ui.active = False
-            well.ui.update()
-        self.plate.selected_rng = None
+        if self.plate.selected_rng <> None:
+            if self.operation == 'clear':
+                self.plate.selected_rng.clear(item = self.Operation_Clear_by.GetValue())
+            elif self.operation == 'fill':
+                if self.item <> 'value' :
+                    n = self.plate.selected_rng.autoFill(item = self.item,
+                                                     entry = self.entry,
+                                                     index = self.index[self.item],
+                                                     n_row = self.Settings_row.GetValue(),
+                                                     n_column = self.Settings_col.GetValue(),
+                                                     fill_by = self.Operation_Fill_by.GetValue(),
+                                                     direction = self.direction,
+                                                     iteration = self.Settings_Iteration.GetValue())
+                    self.index[self.item] = n
+                    self.Settings_entry.SetSelection(n)
+            for well in self.plate.selected_rng.wells:
+                well.ui.active = False
+                well.ui.update()
+            self.plate.selected_rng = None
 
 def main():
 
     app = wx.App()
-    a = Plate('myplate',8,12)
+    a = Plate('myplate',16,24)
     
     a.initui()
     print 'Plate showed!'
