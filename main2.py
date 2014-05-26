@@ -332,7 +332,7 @@ class Range(object):
         else:
             return Range(start_well, end_well)
         
-    def autoFill(self, item = 'sample', entry = [], index = 0, n_row = 2, n_column = 2, direction = 1, s_shape = False):
+    def autoFill(self, item = 'sample', entry = [], index = 0, n_row = 2, n_column = 2, direction = 1, fill_by = 'replace', s_shape = False):
         x = self.n_columns / n_column
         y = self.n_rows / n_row
         if direction == 1:
@@ -342,8 +342,12 @@ class Range(object):
                     for m in range(n_column):
                         for n in range(n_row):
                             if item.lower() == 'sample':
+                                if fill_by == 'replace':
+                                    well.offset(n, m).clearSamples()
                                 well.offset(n, m).addSample(entry[index % len(entry)])
                             elif item.lower() == 'detector':
+                                if fill_by == 'replace':
+                                    well.offset(n, m).clearDetectors()
                                 well.offset(n, m).addDetector(entry[index % len(entry)])
                     index += 1
         elif direction == 2:
@@ -353,8 +357,12 @@ class Range(object):
                     for m in range(n_column):
                         for n in range(n_row):
                             if item.lower() == 'sample':
+                                if fill_by == 'replace':
+                                    well.offset(n, m).clearSamples()
                                 well.offset(n, m).addSample(entry[index % len(entry)])
                             elif item.lower() == 'detector':
+                                if fill_by == 'replace':
+                                    well.offset(n, m).clearDetectors()
                                 well.offset(n, m).addDetector(entry[index % len(entry)])
                     index += 1
         return index
@@ -521,6 +529,9 @@ class Well_ui(wx.Panel):
             self.t2.SetLabel(self.well.getDetectorNames())
         elif self.Parent.item == 'value':
             self.t2.SetLabel(self.well.getDetectorValues())
+        self.Parent.sb.SetStatusText('Address: ' + self.well.address, 0)
+        self.Parent.sb.SetStatusText('Samples: ' + self.well.getSampleNames(), 1)
+        self.Parent.sb.SetStatusText('Detectors: ' + self.well.getDetectorNames(), 2)
         self.Parent.Info_Address.SetLabel(self.well.address)
         self.Parent.Info_Samples.SetLabel(self.well.getSampleNames())
         self.Parent.Info_Detectors.SetLabel(self.well.getDetectorNames())
@@ -541,6 +552,7 @@ class Well_ui(wx.Panel):
                                          index = self.Parent.index[self.Parent.item],
                                          n_row = self.Parent.Settings_row.GetValue(),
                                          n_column = self.Parent.Settings_col.GetValue(),
+                                         fill_by = self.Parent.Operation_Fill_by.GetValue(),
                                          direction = self.Parent.direction)
         
         for well in self.plate.selected_rng.wells:
@@ -555,8 +567,9 @@ class Plate_ui(wx.Frame):
         self.item = 'sample'
         self.index = {'sample' : 0, 'detector' : 0}
         self.direction = 1
-        self.Bind(wx.EVT_LEFT_DOWN, self.OnLeftdown)
-        self.Bind(wx.EVT_LEFT_UP, self.OnLeftup)
+        self.clear = 'all'
+        self.iteration = True
+        self.s_shape = False
         self.entry = sample
         self.initui()
         self.bind_event()
@@ -573,11 +586,16 @@ class Plate_ui(wx.Frame):
         wx.Button(toppanel, label='Load Raw Data', pos=(pos + gap, 30))
         pos += width
         
-        width = 85
+        width = 150
         pos += gap
         wx.StaticBox(toppanel, label='Operation', pos=(pos, 0), size=(width, hight))
-        wx.RadioButton(toppanel, label='Fill', pos=(pos + gap, 20), style=wx.RB_GROUP)
-        wx.RadioButton(toppanel, label='Clear', pos=(pos + gap, 40))
+        wx.RadioButton(toppanel, label='Fill by:', pos=(pos + gap, 23), style=wx.RB_GROUP)
+        wx.RadioButton(toppanel, label='Clear:', pos=(pos + gap, 53))
+        pos1 = pos + 70
+        self.Operation_Fill_by = wx.ComboBox(toppanel, pos=(pos1, 20), size=(70, -1), choices=['replace', 'append'], style=wx.CB_READONLY)
+        self.Operation_Fill_by.SetValue('replace')
+        self.Operation_Clear_by = wx.ComboBox(toppanel, pos=(pos1, 50), size=(70, -1), choices=['all', 'samples', 'detectors'], style=wx.CB_READONLY)
+        self.Operation_Clear_by.SetValue('all')
         pos += width
         
         width = 90
@@ -588,9 +606,9 @@ class Plate_ui(wx.Frame):
         self.Items_Values = wx.RadioButton(toppanel, label='Values', pos=(pos + gap, 60))
         pos += width
         
-        width = 300
+        width = 400
         pos += gap
-        wx.StaticBox(toppanel, label='Settings', pos=(pos, 1), size=(width, hight))
+        wx.StaticBox(toppanel, label='Settings', pos=(pos, 0), size=(width, hight))
         wx.StaticText(toppanel, label='Start from:', pos=(pos + gap, 20))
         wx.StaticText(toppanel, label='Size (x*y):', pos=(pos + gap, 50))
         pos1 = pos + 80
@@ -606,16 +624,25 @@ class Plate_ui(wx.Frame):
         pos1 += 8
         self.Settings_row = wx.SpinCtrl(toppanel, value='2', pos=(pos1, 50), size=(40, -1))
         self.Settings_row.SetRange(1, self.plate.n_rows)
-        pos1 += 55
+        pos1 += 65
         wx.StaticText(toppanel, label='Direction:', pos=(pos1, 20))
         pos1 += 5
         self.Settings_Direction1 = wx.RadioButton(toppanel, label='Top to botton', pos=(pos1, 40), style=wx.RB_GROUP)
         self.Settings_Direction2 = wx.RadioButton(toppanel, label='Left to right', pos=(pos1, 60))
+        pos1 += 110
+        wx.StaticText(toppanel, label='Mode:', pos=(pos1, 20))
+        pos1 += 5
+        self.Settings_Iteration = wx.CheckBox(toppanel, label='Iteration', pos=(pos1, 40))
+        self.Settings_Iteration.SetValue(True)
+        self.Settings_S_shape = wx.CheckBox(toppanel, label='S shape', pos=(pos1, 60))
+        self.Settings_S_shape.SetValue(False)
         pos += width
         
-        width = 200
+        self.sb = self.CreateStatusBar(3)
+        
+        width = 150
         pos += gap
-        wx.StaticBox(toppanel, label='Info', pos=(pos, 1), size=(width, hight))
+        wx.StaticBox(toppanel, label='Info', pos=(pos, 0), size=(width, hight))
         wx.StaticText(toppanel, label='Address:', pos=(pos + gap, 20))
         wx.StaticText(toppanel, label='Samples:', pos=(pos + gap, 40))
         wx.StaticText(toppanel, label='Detectors:', pos=(pos + gap, 60))
@@ -629,6 +656,8 @@ class Plate_ui(wx.Frame):
         self.vbox.Add(toppanel, 0, flag=wx.EXPAND|wx.LEFT|wx.TOP|wx.RIGHT, border = 0)
         
     def bind_event(self):
+        self.Bind(wx.EVT_LEFT_DOWN, self.OnLeftdown)
+        self.Bind(wx.EVT_LEFT_UP, self.OnLeftup)
         self.Items_Samples.Bind(wx.EVT_RADIOBUTTON, self.OnItemchange)
         self.Items_Detectors.Bind(wx.EVT_RADIOBUTTON, self.OnItemchange)
         self.Items_Values.Bind(wx.EVT_RADIOBUTTON, self.OnItemchange)
@@ -689,6 +718,7 @@ class Plate_ui(wx.Frame):
                                          index = self.index[self.Parent.item],
                                          n_row = self.Settings_row.GetValue(),
                                          n_column = self.Settings_col.GetValue(),
+                                         fill_by = self.Operation_Fill_by.GetValue(),
                                          direction = self.direction)
         for well in self.plate.selected_rng.wells:
             well.ui.active = False
