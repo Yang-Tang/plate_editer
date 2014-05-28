@@ -108,8 +108,8 @@ class Well(object):
         self.plate = plate
         self.samples = set()
         self.detectors = set()
-        self.ui = Well_ui(self.plate.ui, self.plate, self)
-        print 'well inited!'
+        self.ui = Well_ui(self.plate.ui.mainpanel, self.plate, self)
+
 #
     def addSample(self, sample):
         self.samples.add(sample)
@@ -214,6 +214,9 @@ class Plate(object):
         self.n_rows = n_rows
         self.n_columns = n_columns
         self.ui = Plate_ui(None, self)
+        self.initui()
+        
+    def addWells(self):
         self.wells = {}
         self.grid = wx.GridSizer(self.n_rows, self.n_columns, 1, 1)
         n = 0
@@ -222,10 +225,14 @@ class Plate(object):
                 address = ROW_NAMES[j] + COLUMN_NAMES[i]
                 well = Well(address, self)
                 self.wells[address] = well
-                self.grid.Add(well.ui, 1, wx.EXPAND|wx.ALL, 0)
+                self.grid.Add(well.ui, 0, wx.EXPAND|wx.ALL, 0)
                 n += 1
-                #self.ui.gauge.SetValue(n)
-        print 'Plate inited!'
+                self.ui.gauge.SetValue(n)
+        self.ui.mainsizer.Add(self.grid, 1, wx.EXPAND, 0)
+        self.ui.gaugepanel.Hide()
+        self.ui.toppanel.Show()
+        self.ui.mainpanel.Show()
+        self.ui.Layout()
 
     def getName(self):
         return self.name
@@ -245,10 +252,15 @@ class Plate(object):
         return myRange.plate == self
     def initui(self):
 
-        self.ui.vbox.Add(self.grid, proportion = 1, flag=wx.EXPAND|wx.ALL, border = 10)
+        #self.ui.mainpanel.SetSizer(self.grid)
+        #self.ui.vbox = wx.BoxSizer(wx.VERTICAL)
+        #self.ui.vbox.Add(self.ui.toppanel, 0, flag=wx.EXPAND|wx.LEFT|wx.TOP|wx.RIGHT, border = 0)
+        #self.ui.vbox.Add(self.ui.mainpanel, proportion = 1, flag=wx.EXPAND|wx.ALL, border = 5)
+        #self.ui.mainpanel.Hide()
+        #self.ui.vbox.Add(self.grid, proportion = 1, flag=wx.EXPAND|wx.ALL, border = 10)
 
         #self.ui.SetSizer(vbox)
-
+        #self.ui.mainsizer.Add(self.grid, 1, wx.EXPAND, 0)
         self.ui.SetSizer(self.ui.vbox)
         self.ui.SetSize((self.n_columns * 75, self.n_rows * 60))
         self.ui.SetTitle(self.name)
@@ -428,7 +440,7 @@ class Well_ui(wx.Panel):
         self.SetBackgroundColour(self.color)
         self.mouseover = False
         self.Bind(wx.EVT_LEFT_DOWN, self.OnLeftdown)
-        self.Bind(wx.EVT_LEFT_UP, self.Parent.OnLeftup)
+        self.Bind(wx.EVT_LEFT_UP, self.plate.ui.OnLeftup)
         self.Bind(wx.EVT_MOTION, self.OnMotion)
         self.Bind(wx.EVT_KEY_DOWN, self.OnKeydown)
         self.Bind(wx.EVT_KEY_UP, self.OnKeyup)
@@ -450,7 +462,7 @@ class Well_ui(wx.Panel):
                   83 : (1, 0),
                   68 : (0, 1),
                   87 : (-1, 0)}
-        print e.GetKeyCode()
+
         key = e.GetKeyCode()
         a = keymap.get(key)
         if a <> None and self.plate.over_well <> None:
@@ -464,7 +476,7 @@ class Well_ui(wx.Panel):
                 self.plate.over_well = new_well
                 if e.ControlDown():
                     new_rng = Range(self.plate.start_well, self.plate.over_well)
-                    print new_rng.show()
+
                     if self.plate.over_well in self.plate.selected_rng.wells:
                         for well in self.plate.selected_rng.wells - new_rng.wells:
                             well.ui.active = False
@@ -525,18 +537,18 @@ class Well_ui(wx.Panel):
         else:
             self.color = self.inactive_color
         self.SetBackgroundColour(self.color)
-        if self.Parent.item == 'sample':
+        if self.plate.ui.item == 'sample':
             self.t2.SetLabel(self.well.getSampleNames())
-        elif self.Parent.item == 'detector':
+        elif self.plate.ui.item == 'detector':
             self.t2.SetLabel(self.well.getDetectorNames())
-        elif self.Parent.item == 'value':
+        elif self.plate.ui.item == 'value':
             self.t2.SetLabel(self.well.getDetectorValues())
-        self.Parent.sb.SetStatusText('Address: ' + self.well.address, 0)
-        self.Parent.sb.SetStatusText('Samples: ' + self.well.getSampleNames(), 1)
-        self.Parent.sb.SetStatusText('Detectors: ' + self.well.getDetectorNames(), 2)
-        #self.Parent.Info_Address.SetLabel(self.well.address)
-        #self.Parent.Info_Samples.SetLabel(self.well.getSampleNames())
-        #self.Parent.Info_Detectors.SetLabel(self.well.getDetectorNames())
+        self.plate.ui.sb.SetStatusText('Address: ' + self.well.address, 0)
+        self.plate.ui.sb.SetStatusText('Samples: ' + self.well.getSampleNames(), 1)
+        self.plate.ui.sb.SetStatusText('Detectors: ' + self.well.getDetectorNames(), 2)
+        #self.plate.ui.Info_Address.SetLabel(self.well.address)
+        #self.plate.ui.Info_Samples.SetLabel(self.well.getSampleNames())
+        #self.plate.ui.Info_Detectors.SetLabel(self.well.getDetectorNames())
         self.Refresh()
 
     def OnLeftdown(self, e):
@@ -549,16 +561,16 @@ class Well_ui(wx.Panel):
         self.update()
     
     def OnLeftup(self, e):
-        n = self.plate.selected_rng.autoFill(item = self.Parent.item,
-                                            entry = self.Parent.entry,
-                                            index = self.Parent.index[self.Parent.item],
-                                            n_row = self.Parent.Settings_row.GetValue(),
-                                            n_column = self.Parent.Settings_col.GetValue(),
-                                            fill_by = self.Parent.Operation_Fill_by.GetValue(),
-                                            direction = self.Parent.direction)
-        self.Parent.index[self.Parent.item] = n
-        print n
-        self.Parent.Settings_entry.SetSelection(n)
+        n = self.plate.selected_rng.autoFill(item = self.plate.ui.item,
+                                            entry = self.plate.ui.entry,
+                                            index = self.plate.ui.index[self.plate.ui.item],
+                                            n_row = self.plate.ui.Settings_row.GetValue(),
+                                            n_column = self.plate.ui.Settings_col.GetValue(),
+                                            fill_by = self.plate.ui.Operation_Fill_by.GetValue(),
+                                            direction = self.plate.ui.direction)
+        self.plate.ui.index[self.plate.ui.item] = n
+
+        self.plate.ui.Settings_entry.SetSelection(n)
         for well in self.plate.selected_rng.wells:
             well.ui.active = False
             well.ui.update()
@@ -587,7 +599,7 @@ class Plate_ui(wx.Frame):
         gap = 5
         pos += gap
         wx.StaticBox(toppanel, label='Raw data', pos=(pos, 0), size=(width, hight))
-        wx.Button(toppanel, label='Load Raw Data', pos=(pos + gap, 30))
+        self.Raw_btn = wx.Button(toppanel, label='Load Raw Data', pos=(pos + gap, 30))
         pos += width
         
         width = 150
@@ -643,25 +655,25 @@ class Plate_ui(wx.Frame):
         pos += width
         
         self.sb = self.CreateStatusBar(3)
+        self.toppanel = toppanel
+        #self.toppanel.Hide()
+        self.mainpanel = wx.Panel(self)
+        self.mainsizer = wx.BoxSizer(wx.VERTICAL)
+        self.mainpanel.SetSizer(self.mainsizer)
+        self.mainpanel.Hide()
         
-        #width = 150
-        #pos += gap
-        #wx.StaticBox(toppanel, label='Info', pos=(pos, 0), size=(width, hight))
-        #wx.StaticText(toppanel, label='Address:', pos=(pos + gap, 20))
-        #wx.StaticText(toppanel, label='Samples:', pos=(pos + gap, 40))
-        #wx.StaticText(toppanel, label='Detectors:', pos=(pos + gap, 60))
-        #pos1 = pos + 70
-        #self.Info_Address = wx.StaticText(toppanel, label='NA', pos=(pos1, 20))
-        #self.Info_Samples = wx.StaticText(toppanel, label='NA', pos=(pos1, 40))
-        #self.Info_Detectors = wx.StaticText(toppanel, label='NA', pos=(pos1, 60))
-        #pos += width
+        self.gaugepanel = wx.Panel(self)
+        self.gauge = wx.Gauge(self.gaugepanel, range=self.plate.n_columns * self.plate.n_rows, size=(250, 25))
 
         self.vbox = wx.BoxSizer(wx.VERTICAL)
-        self.vbox.Add(toppanel, 0, flag=wx.EXPAND|wx.LEFT|wx.TOP|wx.RIGHT, border = 0)
+        self.vbox.Add(self.toppanel, 0, flag=wx.EXPAND|wx.LEFT|wx.TOP|wx.RIGHT, border = 0)
+        self.vbox.Add(self.mainpanel, proportion = 1, flag=wx.EXPAND|wx.ALL, border = 3)
+        self.vbox.Add(self.gaugepanel, proportion = 1, flag=wx.EXPAND|wx.ALL, border = 3)
         
     def bind_event(self):
         self.Bind(wx.EVT_LEFT_DOWN, self.OnLeftdown)
         self.Bind(wx.EVT_LEFT_UP, self.OnLeftup)
+        self.Raw_btn.Bind(wx.EVT_BUTTON, self.OnRawdataload)
         self.Operation_fill.Bind(wx.EVT_RADIOBUTTON, self.OnOperationchange)
         self.Operation_clear.Bind(wx.EVT_RADIOBUTTON, self.OnOperationchange)
         self.Items_Samples.Bind(wx.EVT_RADIOBUTTON, self.OnItemchange)
@@ -671,6 +683,9 @@ class Plate_ui(wx.Frame):
         self.Settings_Direction1.Bind(wx.EVT_RADIOBUTTON, self.OnDirectionchange)
         self.Settings_Direction2.Bind(wx.EVT_RADIOBUTTON, self.OnDirectionchange)
 
+    def OnRawdataload(self, e):
+        self.plate.addWells()
+    
     def OnOperationchange(self, e):
         f = self.Operation_fill.GetValue()
         c = self.Operation_clear.GetValue()
@@ -756,8 +771,8 @@ def main():
     app = wx.App()
     a = Plate('myplate',16,24)
     
-    a.initui()
-    print 'Plate showed!'
+    #a.initui()
+    #a.addWells()
     #b = Range(a.getWell('a1'),a.getWell('d5'))
     #b.autoFill(item, entry, direction = 1)
     app.MainLoop()
