@@ -176,3 +176,7 @@ class Range(object):
                 self._plate.set(item_class, tmp_plate.get(item_class, pos), offset_pos)
         return self
     def clearall(self, item_class = None):
+        for pos in self.positions():
+            self._plate.clear(item_class, pos)
+        return self
+
